@@ -9,14 +9,15 @@ from sys import platform
 from os import environ as environmental_variables
 from os.path import join as join_path
 
+from os.path import exists as path_exists
+import os
 
-WORKSPACE = {
-    "name": "InstaPy",
-    "path": environmental_variables.get("INSTAPY_WORKSPACE"),
-}
-OS_ENV = (
-    "windows" if platform == "win32" else "osx" if platform == "darwin" else "linux"
-)
+environmental_variables["INSTAPY_WORKSPACE"] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WORKSPACE = {"name": "InstaPy",
+             "path": environmental_variables.get("INSTAPY_WORKSPACE")}
+OS_ENV = ("windows" if platform == "win32"
+          else "osx" if platform == "darwin"
+          else "linux")
 
 
 def localize_path(*args):

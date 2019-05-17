@@ -18,6 +18,8 @@ from .util import extract_text_from_element
 from .quota_supervisor import quota_supervisor
 from .unfollow_util import get_following_status
 from .event import Event
+from .print_log_writer import log_record_all_liked
+from .print_log_writer import get_log_time
 
 from selenium.common.exceptions import WebDriverException
 from selenium.common.exceptions import NoSuchElementException
@@ -731,7 +733,7 @@ def check_link(
     return False, user_name, is_video, "None", "Success"
 
 
-def like_image(browser, username, blacklist, logger, logfolder, total_liked_img):
+def like_image(login, link, browser, username, blacklist, logger, logfolder, total_liked_img):
     """Likes the browser opened image"""
     # check action availability
     if quota_supervisor("likes") == "jump":
@@ -763,6 +765,10 @@ def like_image(browser, username, blacklist, logger, logfolder, total_liked_img)
                 add_user_to_blacklist(
                     username, blacklist["campaign"], action, logger, logfolder
                 )
+
+            # record all liked users
+            logtime = get_log_time()
+            log_record_all_liked(login, username, logger, logfolder, logtime, link)
 
             # get the post-like delay time to sleep
             naply = get_action_delay("like")

@@ -17,6 +17,7 @@ import logging.handlers
 from contextlib import contextmanager
 from copy import deepcopy
 import unicodedata
+import glob
 
 try:
     from pyvirtualdisplay import Display
@@ -146,6 +147,15 @@ class InstaPy:
             else:
                 raise InstaPyError("The 'nogui' parameter isn't supported on Windows.")
 
+        path = "logs/{0}/relationship_data/{0}/followers/**/*json".format(username)
+        if os.path.isfile(path):
+            list_of_json = glob.glob(path, recursive=True)
+            latest_json = max(list_of_json, key=os.path.getctime)
+            with open(latest_json) as data_file:
+                self.followers = json.load(data_file)
+        else:
+            self.followers = []
+
         self.browser = None
         self.page_delay = page_delay
         self.disable_image_load = disable_image_load
@@ -263,7 +273,7 @@ class InstaPy:
         self.skip_private_percentage = 100
         self.relationship_data = {username: {"all_following": [], "all_followers": []}}
 
-        self.simulation = {"enabled": True, "percentage": 100}
+        self.simulation = {"enabled": False, "percentage": 100}
 
         self.mandatory_language = False
         self.mandatory_character = []
@@ -907,6 +917,10 @@ class InstaPy:
                         )
                         break
 
+                    if commenter in self.followers:
+                        self.logger.info("This user is already following you ~skipped following {}\n".format(commenter))
+                        continue
+
                     with self.feature_in_feature("follow_by_list", True):
                         followed = self.follow_by_list(
                             commenter, self.follow_times, sleep_delay, interact
@@ -1035,6 +1049,10 @@ class InstaPy:
                         )
                         break
 
+                    if liker in self.followers:
+                        self.logger.info("This user is already following you ~skipped following {}\n".format(liker))
+                        continue
+
                     with self.feature_in_feature("follow_by_list", True):
                         followed = self.follow_by_list(
                             liker, self.follow_times, sleep_delay, interact
@@ -1145,10 +1163,13 @@ class InstaPy:
                 self.quotient_breach = True if not standalone else False
                 break
 
-            if follow_restriction(
-                "read", acc_to_follow, self.follow_times, self.logger
-            ):
-                print("")
+            if acc_to_follow in self.followers:
+                self.logger.info("This user is already following you ~skipped following {}\n".format(acc_to_follow))
+                continue
+
+            if follow_restriction("read", acc_to_follow, self.follow_times,
+                                  self.logger):
+                print('')
                 continue
 
             if not users_validated:
@@ -1499,14 +1520,15 @@ class InstaPy:
                             web_address_navigator(self.browser, link)
 
                         # try to like
-                        like_state, msg = like_image(
-                            self.browser,
-                            user_name,
-                            self.blacklist,
-                            self.logger,
-                            self.logfolder,
-                            liked_img,
-                        )
+                        like_state, msg = like_image(self.username,
+                                                     link,
+                                                     self.browser,
+                                                     user_name,
+                                                     self.blacklist,
+                                                     self.logger,
+                                                     self.logfolder,
+                                                     liked_img,
+                                                     )
 
                         if like_state is True:
                             liked_img += 1
@@ -1558,6 +1580,8 @@ class InstaPy:
                                     )
                                     if comments:
                                         comment_state, msg = comment_image(
+                                            self.username,
+                                            link,
                                             self.browser,
                                             user_name,
                                             comments,
@@ -1765,6 +1789,8 @@ class InstaPy:
                                 )
                                 if comments:
                                     comment_state, msg = comment_image(
+                                        self.username,
+                                        link,
                                         self.browser,
                                         user_name,
                                         comments,
@@ -1941,14 +1967,15 @@ class InstaPy:
                             web_address_navigator(self.browser, link)
 
                         # try to like
-                        like_state, msg = like_image(
-                            self.browser,
-                            user_name,
-                            self.blacklist,
-                            self.logger,
-                            self.logfolder,
-                            liked_img,
-                        )
+                        like_state, msg = like_image(self.username,
+                                                     link,
+                                                     self.browser,
+                                                     user_name,
+                                                     self.blacklist,
+                                                     self.logger,
+                                                     self.logfolder,
+                                                     liked_img,
+                                                     )
 
                         if like_state is True:
                             liked_img += 1
@@ -2000,6 +2027,8 @@ class InstaPy:
                                     )
                                     if comments:
                                         comment_state, msg = comment_image(
+                                            self.username,
+                                            link,
                                             self.browser,
                                             user_name,
                                             comments,
@@ -2139,8 +2168,14 @@ class InstaPy:
             if self.quotient_breach:
                 break
 
-            self.logger.info("Username [{}/{}]".format(index + 1, len(usernames)))
-            self.logger.info("--> {}".format(username.encode("utf-8")))
+            if username in self.followers:
+                self.logger.info("This user is already following you ~skipped interacting {}\n".format(username))
+                continue
+
+            self.logger.info("Username [{}/{}]"
+                             .format(index + 1, len(usernames)))
+            self.logger.info("--> {}"
+                             .format(username.encode('utf-8')))
 
             following = random.randint(0, 100) <= self.follow_percentage
 
@@ -2240,14 +2275,15 @@ class InstaPy:
                         )
 
                     if not inappropriate and self.liking_approved:
-                        like_state, msg = like_image(
-                            self.browser,
-                            user_name,
-                            self.blacklist,
-                            self.logger,
-                            self.logfolder,
-                            total_liked_img,
-                        )
+                        like_state, msg = like_image(self.username,
+                                                     link,
+                                                     self.browser,
+                                                     user_name,
+                                                     self.blacklist,
+                                                     self.logger,
+                                                     self.logfolder,
+                                                     total_liked_img,
+                                                     )
                         if like_state is True:
                             total_liked_img += 1
                             liked_img += 1
@@ -2297,6 +2333,8 @@ class InstaPy:
                                     )
                                     if comments:
                                         comment_state, msg = comment_image(
+                                            self.username,
+                                            link,
                                             self.browser,
                                             user_name,
                                             comments,
@@ -2401,8 +2439,13 @@ class InstaPy:
                 self.quotient_breach = True if not standalone else False
                 break
 
-            self.logger.info("Username [{}/{}]".format(index + 1, len(usernames)))
-            self.logger.info("--> {}".format(username.encode("utf-8")))
+            if username in self.followers:
+                self.logger.info("This user is already following you ~skipped interacting {}\n".format(username))
+                continue
+
+            self.logger.info(
+                'Username [{}/{}]'.format(index + 1, len(usernames)))
+            self.logger.info('--> {}'.format(username.encode('utf-8')))
 
             if not users_validated:
                 validation, details = self.validate_user_call(username)
@@ -2542,14 +2585,16 @@ class InstaPy:
                             )
 
                         if self.do_like and liking and self.liking_approved:
-                            like_state, msg = like_image(
-                                self.browser,
-                                user_name,
-                                self.blacklist,
-                                self.logger,
-                                self.logfolder,
-                                total_liked_img,
-                            )
+
+                            like_state, msg = like_image(self.username,
+                                                         link,
+                                                         self.browser,
+                                                         user_name,
+                                                         self.blacklist,
+                                                         self.logger,
+                                                         self.logfolder,
+                                                         total_liked_img,
+                                                         )
                             if like_state is True:
                                 total_liked_img += 1
                                 liked_img += 1
@@ -2591,6 +2636,8 @@ class InstaPy:
                                         )
                                         if comments:
                                             comment_state, msg = comment_image(
+                                                self.username,
+                                                link,
                                                 self.browser,
                                                 user_name,
                                                 comments,
@@ -2733,8 +2780,13 @@ class InstaPy:
                 self.quotient_breach = True if not standalone else False
                 break
 
-            self.logger.info("Username [{}/{}]".format(index + 1, len(usernames)))
-            self.logger.info("--> {}".format(username.encode("utf-8")))
+            if username in self.followers:
+                self.logger.info("This user is already following you ~skipped interacting {}\n".format(username))
+                continue
+
+            self.logger.info(
+                'Username [{}/{}]'.format(index + 1, len(usernames)))
+            self.logger.info('--> {}'.format(username.encode('utf-8')))
 
             if not users_validated and username != self.username:
                 validation, details = self.validate_user_call(username)
@@ -2863,14 +2915,16 @@ class InstaPy:
                             )
 
                         if self.do_like and liking and self.liking_approved:
-                            like_state, msg = like_image(
-                                self.browser,
-                                user_name,
-                                self.blacklist,
-                                self.logger,
-                                self.logfolder,
-                                total_liked_img,
-                            )
+
+                            like_state, msg = like_image(self.username,
+                                                         link,
+                                                         self.browser,
+                                                         user_name,
+                                                         self.blacklist,
+                                                         self.logger,
+                                                         self.logfolder,
+                                                         total_liked_img,
+                                                         )
                             if like_state is True:
                                 total_liked_img += 1
                                 liked_img += 1
@@ -2923,6 +2977,8 @@ class InstaPy:
                                             )
 
                                         comment_state, msg = comment_image(
+                                            self.username,
+                                            link,
                                             self.browser,
                                             user_name,
                                             comments,
@@ -3126,9 +3182,14 @@ class InstaPy:
                     )
                     break
 
-                self.logger.info(
-                    "User '{}' [{}/{}]".format((person), index + 1, len(person_list))
-                )
+
+                if person in self.followers:
+                    self.logger.info("This user is already following you ~skipped following {}\n".format(person))
+                    continue
+
+                self.logger.info("User '{}' [{}/{}]".format((person),
+                                                            index + 1,
+                                                            len(person_list)))
 
                 validation, details = self.validate_user_call(person)
                 if validation is not True:
@@ -3301,9 +3362,13 @@ class InstaPy:
                     )
                     break
 
-                self.logger.info(
-                    "User '{}' [{}/{}]".format((person), index + 1, len(person_list))
-                )
+                if person in self.followers:
+                    self.logger.info("This user is already following you ~skipped interacting {}\n".format(person))
+                    continue
+
+                self.logger.info("User '{}' [{}/{}]".format((person),
+                                                            index + 1,
+                                                            len(person_list)))
 
                 validation, details = self.validate_user_call(person)
                 if validation is not True:
@@ -3478,6 +3543,10 @@ class InstaPy:
                         "\t~leaving Follow-User-Followers activity\n"
                     )
                     break
+
+                if person in self.followers:
+                    self.logger.info("This user is already following you ~skipped following {}\n".format(person))
+                    continue
 
                 self.logger.info(
                     "Ongoing Follow [{}/{}]: now following '{}'...".format(
@@ -3664,6 +3733,10 @@ class InstaPy:
                         "\t~leaving Follow-User-Following activity\n"
                     )
                     break
+
+                if person in self.followers:
+                    self.logger.info("This user is already following you ~skipped following {}\n".format(person))
+                    continue
 
                 self.logger.info(
                     "Ongoing Follow [{}/{}]: now following '{}'...".format(
@@ -4016,14 +4089,15 @@ class InstaPy:
                                     web_address_navigator(self.browser, link)
 
                                 # try to like
-                                like_state, msg = like_image(
-                                    self.browser,
-                                    user_name,
-                                    self.blacklist,
-                                    self.logger,
-                                    self.logfolder,
-                                    liked_img,
-                                )
+                                like_state, msg = like_image(self.username,
+                                                             link,
+                                                             self.browser,
+                                                             user_name,
+                                                             self.blacklist,
+                                                             self.logger,
+                                                             self.logfolder,
+                                                             liked_img,
+                                                             )
 
                                 if like_state is True:
                                     liked_img += 1
@@ -4080,7 +4154,11 @@ class InstaPy:
                                                 is_video, temp_comments
                                             )
                                             if comments:
-                                                comment_state, msg = comment_image(
+
+                                                comment_state, \
+                                                msg = comment_image(
+                                                    self.username,
+                                                    link,
                                                     self.browser,
                                                     user_name,
                                                     comments,
@@ -4810,14 +4888,15 @@ class InstaPy:
                         web_address_navigator(self.browser, url)
 
                     # try to like
-                    like_state, msg = like_image(
-                        self.browser,
-                        user_name,
-                        self.blacklist,
-                        self.logger,
-                        self.logfolder,
-                        liked_img,
-                    )
+                    like_state, msg = like_image(self.username,
+                                                 url,
+                                                 self.browser,
+                                                 user_name,
+                                                 self.blacklist,
+                                                 self.logger,
+                                                 self.logfolder,
+                                                 liked_img,
+                                                 )
 
                     if like_state is True:
                         liked_img += 1
@@ -4866,6 +4945,8 @@ class InstaPy:
                                 )
                                 if comments:
                                     comment_state, msg = comment_image(
+                                        self.username,
+                                        url,
                                         self.browser,
                                         user_name,
                                         comments,
@@ -5388,14 +5469,15 @@ class InstaPy:
                     continue
 
                 # like the post before interacting on comments
-                image_like_state, msg = like_image(
-                    self.browser,
-                    user_name,
-                    self.blacklist,
-                    self.logger,
-                    self.logfolder,
-                    self.liked_img,
-                )
+                image_like_state, msg = like_image(self.username,
+                                                   link,
+                                                   self.browser,
+                                                   user_name,
+                                                   self.blacklist,
+                                                   self.logger,
+                                                   self.logfolder,
+                                                   self.liked_img,
+                                                   )
                 if image_like_state is True:
                     like_failures_tracker["consequent"]["post_likes"] = 0
                     self.liked_img += 1

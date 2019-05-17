@@ -16,6 +16,8 @@ from .event import Event
 from .like_util import get_media_edge_comment_string
 from .quota_supervisor import quota_supervisor
 from .xpath import read_xpath
+from .print_log_writer import log_record_all_commented
+from .print_log_writer import get_log_time
 
 from selenium.common.exceptions import WebDriverException
 from selenium.common.exceptions import InvalidElementStateException
@@ -58,7 +60,7 @@ def open_comment_section(browser, logger):
         logger.warning(missing_comment_elem_warning)
 
 
-def comment_image(browser, username, comments, blacklist, logger, logfolder):
+def comment_image(login, link, browser, username, comments, blacklist, logger, logfolder):
     """Checks if it should comment on the image"""
     # check action availability
     if quota_supervisor("comments") == "jump":
@@ -115,6 +117,11 @@ def comment_image(browser, username, comments, blacklist, logger, logfolder):
                 add_user_to_blacklist(
                     username, blacklist["campaign"], action, logger, logfolder
                 )
+
+            # record all commented users
+            logtime = get_log_time()
+            log_record_all_commented(login, username, logger, logfolder, logtime, link)
+
         else:
             logger.warning(
                 "--> Comment Action Likely Failed!" "\t~comment Element was not found"

@@ -137,3 +137,23 @@ def log_record_all_followed(login, followed, logger, logfolder, logtime, user_id
                 followPool.write("{} ~ {} ~ {},\n".format(logtime, followed, user_id))
     except BaseException as e:
         logger.error("log_record_all_followed_pool error {}".format(str(e)))
+
+def log_record_all_liked(login, liked, logger, logfolder, logtime, link):
+    """logs all liked ever to
+    a seperate file"""
+    try:
+        with open('{0}{1}_record_all_liked.csv'.format(logfolder, login), 'a+') as likedPool:
+            with interruption_handler():
+                likedPool.write('{} ~ {} ~ {},\n'.format(logtime, liked, link))
+    except BaseException as e:
+        logger.error("log_record_all_liked_pool error {}".format(str(e)))
+
+def log_record_all_commented(login, commented, logger, logfolder, logtime, link):
+    """logs all commented ever to
+    a seperate file"""
+    try:
+        with open('{0}{1}_record_all_commented.csv'.format(logfolder, login), 'a+') as commentedPool:
+            with interruption_handler():
+                commentedPool.write('{} ~ {} ~ {},\n'.format(logtime, commented, link))
+    except BaseException as e:
+        logger.error("log_record_all_commented_pool error {}".format(str(e)))
