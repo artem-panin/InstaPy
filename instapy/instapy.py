@@ -1,24 +1,17 @@
 """OS Modules environ method to get the setup vars from the Environment"""
 # import built-in & third-party modules
-import time
+import time, random, os, csv, json, requests, logging, unicodedata
 from datetime import datetime, timedelta
 from math import ceil
-import random
 from sys import platform
 from platform import python_version
-import os
-import csv
-import json
-import requests
 from selenium import webdriver
 from selenium.webdriver import DesiredCapabilities
-import logging
 import logging.handlers
 from contextlib import contextmanager
 from copy import deepcopy
 import unicodedata
 import glob
-
 try:
     from pyvirtualdisplay import Display
 except ModuleNotFoundError:
@@ -30,6 +23,7 @@ from .clarifai_util import check_image
 from .comment_util import comment_image
 from .comment_util import verify_commenting
 from .comment_util import get_comments_on_post
+from .constants import MEDIA_PHOTO, MEDIA_VIDEO
 from .like_util import check_link
 from .like_util import verify_liking
 from .like_util import get_links_for_tag
@@ -121,6 +115,7 @@ class InstaPy:
         geckodriver_path: str = None,
         split_db: bool = False,
         bypass_security_challenge_using: str = "email",
+        want_check_browser: bool = True,
     ):
         print("InstaPy Version: {}".format(__version__))
         cli_args = parse_cli_args()
@@ -132,6 +127,7 @@ class InstaPy:
         proxy_port = cli_args.proxy_port or proxy_port
         disable_image_load = cli_args.disable_image_load or disable_image_load
         split_db = cli_args.split_db or split_db
+        want_check_browser = cli_args.want_check_browser or want_check_browser
 
         Settings.InstaPy_is_running = True
         # workspace must be ready before anything
@@ -172,6 +168,8 @@ class InstaPy:
             Settings.database_location = localize_path(
                 "db", "instapy_{}.db".format(self.username)
             )
+
+        self.want_check_browser = want_check_browser
 
         self.do_comment = False
         self.comment_percentage = 0
@@ -420,6 +418,7 @@ class InstaPy:
             self.logfolder,
             self.proxy_address,
             self.bypass_security_challenge_using,
+            self.want_check_browser,
         ):
             message = (
                 "Unable to login to Instagram! "
@@ -506,7 +505,7 @@ class InstaPy:
         if self.aborting:
             return self
 
-        if media not in [None, "Photo", "Video"]:
+        if media not in [None, MEDIA_PHOTO, MEDIA_VIDEO]:
             self.logger.warning('Unkown media type! Treating as "any".')
             media = None
 
@@ -766,7 +765,6 @@ class InstaPy:
 
             count = limit if limit < data["count"] else data["count"]
             i = 0
-            tags = []
             while i < count:
                 self.smart_location_hashtags.append(data["tags"][i]["tag"])
                 i += 1
@@ -1339,8 +1337,8 @@ class InstaPy:
             self.skip_non_business,
             self.skip_business_percentage,
             self.skip_business_categories,
-            self.skip_bio_keyword,
             self.dont_skip_business_categories,
+            self.skip_bio_keyword,
             self.logger,
             self.logfolder,
         )
@@ -1545,9 +1543,11 @@ class InstaPy:
 
                             if self.use_clarifai and (following or commenting):
                                 try:
-                                    checked_img, temp_comments, clarifai_tags = (
-                                        self.query_clarifai()
-                                    )
+                                    (
+                                        checked_img,
+                                        temp_comments,
+                                        clarifai_tags,
+                                    ) = self.query_clarifai()
 
                                 except Exception as err:
                                     self.logger.error(
@@ -1758,9 +1758,11 @@ class InstaPy:
 
                         if self.use_clarifai:
                             try:
-                                checked_img, temp_comments, clarifai_tags = (
-                                    self.query_clarifai()
-                                )
+                                (
+                                    checked_img,
+                                    temp_comments,
+                                    clarifai_tags,
+                                ) = self.query_clarifai()
 
                             except Exception as err:
                                 self.logger.error("Image check error: {}".format(err))
@@ -1992,9 +1994,11 @@ class InstaPy:
 
                             if self.use_clarifai and (following or commenting):
                                 try:
-                                    checked_img, temp_comments, clarifai_tags = (
-                                        self.query_clarifai()
-                                    )
+                                    (
+                                        checked_img,
+                                        temp_comments,
+                                        clarifai_tags,
+                                    ) = self.query_clarifai()
 
                                 except Exception as err:
                                     self.logger.error(
@@ -2299,9 +2303,11 @@ class InstaPy:
 
                             if self.use_clarifai and (following or commenting):
                                 try:
-                                    checked_img, temp_comments, clarifai_tags = (
-                                        self.query_clarifai()
-                                    )
+                                    (
+                                        checked_img,
+                                        temp_comments,
+                                        clarifai_tags,
+                                    ) = self.query_clarifai()
 
                                 except Exception as err:
                                     self.logger.error(
@@ -2607,9 +2613,11 @@ class InstaPy:
 
                                 if self.use_clarifai and commenting:
                                     try:
-                                        checked_img, temp_comments, clarifai_tags = (
-                                            self.query_clarifai()
-                                        )
+                                        (
+                                            checked_img,
+                                            temp_comments,
+                                            clarifai_tags,
+                                        ) = self.query_clarifai()
 
                                     except Exception as err:
                                         self.logger.error(
@@ -3097,6 +3105,15 @@ class InstaPy:
     def interact_user_followers(
         self, usernames: list, amount: int = 10, randomize: bool = False
     ):
+        """
+        Interact with the people that a given user is followed by.
+
+        set_do_comment, set_do_follow and set_do_like are applicable.
+
+        :param usernames: List of users to interact with their followers.
+        :param amount: Amount of followers to interact with.
+        :param randomize: If followers should be chosen randomly.
+        """
 
         if self.aborting:
             return self
@@ -3192,7 +3209,7 @@ class InstaPy:
                                                             len(person_list)))
 
                 validation, details = self.validate_user_call(person)
-                if validation is not True:
+                if not validation:
                     self.logger.info(details)
                     not_valid_users += 1
 
@@ -3213,7 +3230,7 @@ class InstaPy:
                             self.logger,
                             self.logfolder,
                         )
-                        if unfollow_state is True:
+                        if unfollow_state:
                             simulated_unfollow += 1
 
                     continue
@@ -3221,7 +3238,7 @@ class InstaPy:
                 # Do interactions if any
                 do_interact = random.randint(0, 100) <= self.user_interact_percentage
 
-                if do_interact is False:
+                if not do_interact:
                     self.logger.info(
                         "Skipping user '{}' due to the interaction "
                         "percentage of {}".format(person, self.user_interact_percentage)
@@ -5214,7 +5231,7 @@ class InstaPy:
 
             return self
 
-        if media in ["Photo", "Video"]:
+        if media in [MEDIA_PHOTO, MEDIA_VIDEO]:
             attr = "{}_comment_replies".format(media.lower())
             setattr(self, attr, replies)
 
@@ -5323,7 +5340,7 @@ class InstaPy:
         if not isinstance(usernames, list):
             usernames = [usernames]
 
-        if media not in ["Photo", "Video", None]:
+        if media not in [MEDIA_PHOTO, MEDIA_VIDEO, None]:
             self.logger.warning(
                 "Unkown media type- '{}' set at"
                 " Interact-By-Comments!\t~treating as any..".format(media)
